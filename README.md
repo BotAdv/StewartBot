@@ -27,13 +27,13 @@ ____
 
 ### Environment setup
 
-| Items      | Option |  
-| ----------- | ----------- |  
-|*System* |**X86_64-Unbutu22.04** |  
-|*Software systems* |**ROS2 humble**  |  
-|*Hardware platform* |**NiMotion Motor-STM4248A** |  
-|*Communication* |**CANopen** |  
-|*Controller* |**BECKOFF**|  
+| Items               | Option                      |  
+| -----------         | -----------                 |  
+|*System*             |**X86_64-Unbutu22.04**       |  
+|*Software systems*   |**ROS2 humble**              |  
+|*Hardware platform*  |**NiMotion Motor-STM4248A**  |  
+|*Communication*      |**CANopen**                  |  
+|*Controller*         |**BECKOFF**                  |  
 
 ### Get source code  
 
@@ -65,4 +65,15 @@ ____
 
 [StewartBot-dev](https://github.com/BotAdv/StewartBot.git)
 
+____
+
+## Principle
+
+![github](./doc/img/stewt.avif)
+____
+
+## Collaborators
+
+**BotAdv**  
+**Lancee**  
 ____
