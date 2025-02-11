@@ -11,7 +11,7 @@ ____
 
 ## To Do List
 
-- [ ] Framework Build  
+- [x] Framework Build  
 - [ ] CanOpen Nimotion Motor Control  
 - [ ] Muti Motor Control  
 - [ ] Kinematic modeling  
