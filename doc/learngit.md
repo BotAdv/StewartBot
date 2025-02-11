@@ -55,10 +55,12 @@
 - 各功能节点在子功能包下的src中开发,例如电机驱动程序位于/home/user/Bachelor_ws/src/StewartBot/nimotion_motor/src/motor.cpp  
 - 完成阶段性开发后通过git提交到远程仓库对应分支  
 - 分支概览
-    ├── main
-    ├── feature/Nimotion(BotAdv*)
-    └── feature/IsaacSim(Lancee*)
 
+<pre>
+    ├── main  
+    ├── feature/Nimotion(BotAdv*)  
+    └── feature/IsaacSim(Lancee*)  
+</pre>
 ***
 
 ## Implementation 实施
@@ -267,9 +269,9 @@
 
 ## Reference 参考资料
 
-分支处理[Learn Git Branching](https://learngitbranching.js.org/?locale=zh_CN)
-新手教程[廖雪峰](https://liaoxuefeng.com/books/git/introduction/index.html)
-英文教程[turtutorials-en](https://www.atlassian.com/git/tutorials)
-工作流[workflow](https://nvie.com/posts/a-successful-git-branching-model/)
+分支处理[Learn Git Branching](https://learngitbranching.js.org/?locale=zh_CN)  
+新手教程[廖雪峰](https://liaoxuefeng.com/books/git/introduction/index.html)  
+英文教程[turtutorials-en](https://www.atlassian.com/git/tutorials)  
+工作流[workflow](https://nvie.com/posts/a-successful-git-branching-model/)  
 
 ***
