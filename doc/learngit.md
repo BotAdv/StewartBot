@@ -55,9 +55,12 @@
 - 各功能节点在子功能包下的src中开发,例如电机驱动程序位于/home/user/Bachelor_ws/src/StewartBot/nimotion_motor/src/motor.cpp  
 - 完成阶段性开发后通过git提交到远程仓库对应分支  
 - 分支概览
-    ├── main
-    ├── feature/Nimotion(BotAdv*)
-    └── feature/IsaacSim(Lancee*)
+
+<pre>
+    ├── main  
+    ├── feature/Nimotion(BotAdv*)  
+    └── feature/IsaacSim(Lancee*)  
+</pre>
 
 ***
 
@@ -73,8 +76,8 @@
 
     1.2 ubuntu环境下载vsode
     - 图形界面安装（*推荐）
-        [vscode官网](https://code.visualstudio.com/)下载对应版本安装包
-        解压安装包
+        [vscode官网](https://code.visualstudio.com/)下载对应版本安装包  
+        解压安装包  
 
         ```shell
         sudo dpkg -i code_1.75.0-1675266613_amd64.deb
