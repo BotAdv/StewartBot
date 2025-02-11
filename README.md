@@ -69,10 +69,10 @@ ____
 
 ## Principle
 
-- schematic
-![github](./doc/img/stewt.avif)
-- robotic entity
-![github](./doc/img/stebot.png)
+- schematic  
+![github](./doc/img/stewt.avif)  
+- robotic entity  
+![github](./doc/img/stebot.png)  
 
 ____
 

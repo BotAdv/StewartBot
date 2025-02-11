@@ -66,7 +66,7 @@
 
 ## Implementation 实施
 
-1. **vscode中配置git**  
+1. **vscode中配置git**  （*推荐使用IDE进行程序开发）
 
     1.1 ubuntu环境下载git
 
@@ -75,7 +75,7 @@
     ```
 
     1.2 ubuntu环境下载vsode
-    - 图形界面安装（*推荐）
+    - 图形界面官网安装
         [vscode官网](https://code.visualstudio.com/)下载对应版本安装包  
         解压安装包  
 
@@ -83,7 +83,18 @@
         sudo dpkg -i code_1.75.0-1675266613_amd64.deb
         ```
 
-    - 命令行安装  
+    - 命令行snap工具安装  
+
+        ```shell
+        sudo snap install code --classic
+        ```
+
+        ```shell
+        code .
+        ```
+
+    - 命令行curl工具安装（不推荐，最终解决方案）
+
         获取官方秘钥
 
         ```shell
@@ -120,14 +131,34 @@
         type code
         ```
 
-        启动vsode
+        在当前目录下启动vsode
 
         ```shell
-        code
+        code .
         ```
 
-    1.3 vsode中通过git打开项目
+    - 多种安装方式任选其一，后期部分依赖需要源码编译安装。  
+        vscode非开源软件，并未在仓库中提供源码，暂不提供源码安装。  
+        安装遇到问题请仔细检查系统版本。  
+
+    1.3 vsode中验证git集成  
+
+    ```shell
+        code .
+    ```
+
+    - ctrl + ` 打开终端命令行  
+
+        ```shell
+            git --help
+        ```
+
+    - 左上角查看>>终端>>底部边栏打开终端命令行
     ![code-git](./img/code-git.png)
+
+        ```shell
+            git --help
+        ```
 
 2. **创建工程\***
 
