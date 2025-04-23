@@ -301,9 +301,9 @@
 
 ## Reference 参考资料
 
-分支处理[Learn Git Branching](https://learngitbranching.js.org/?locale=zh_CN)
-新手教程[廖雪峰](https://liaoxuefeng.com/books/git/introduction/index.html)
-英文教程[turtutorials-en](https://www.atlassian.com/git/tutorials)
-工作流[workflow](https://nvie.com/posts/a-successful-git-branching-model/)
+分支处理[Learn Git Branching](https://learngitbranching.js.org/?locale=zh_CN)  
+新手教程[廖雪峰](https://liaoxuefeng.com/books/git/introduction/index.html)  
+英文教程[turtutorials-en](https://www.atlassian.com/git/tutorials)  
+工作流[workflow](https://nvie.com/posts/a-successful-git-branching-model/)  
 
 ***
