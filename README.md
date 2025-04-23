@@ -12,11 +12,11 @@ ____
 ## To Do List
 
 - [x] Framework Build  
-- [ ] CanOpen Nimotion Motor Control  
-- [ ] Muti Motor Control  
-- [ ] Kinematic modeling  
-- [ ] Structural design
-- [ ] Simulation && Prototype verification  
+- [x] CanOpen Nimotion Motor Control  
+- [x] Muti Motor Control  
+- [x] Kinematic modeling  
+- [x] Structural design
+- [x] Simulation && Prototype verification  
 - [ ] Binocular visual perception module  
 - [ ] LiDAR mapping module
 - [ ] Enclosed space SLAM
