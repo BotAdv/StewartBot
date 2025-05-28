@@ -82,16 +82,16 @@ void* receive_func(void* param) {
 
 int main() {
     // 配置CAN接口（需提前执行或在代码中调用system）
-    // system("sudo modprobe vcan");
-    // system("sudo ip link add dev can0 type vcan");
-    // system("sudo ip link add dev can1 type vcan");
-    // system("sudo ip link set can0 up");
-    // system("sudo ip link set can1 up");
-
-    system("sudo ip link set can0 type can bitrate 125000");
-    system("sudo ip link set can1 type can bitrate 125000");
+    system("sudo modprobe vcan");
+    system("sudo ip link add dev can0 type vcan");
+    system("sudo ip link add dev can1 type vcan");
     system("sudo ip link set can0 up");
     system("sudo ip link set can1 up");
+
+    // system("sudo ip link set can0 type can bitrate 125000");
+    // system("sudo ip link set can1 type can bitrate 125000");
+    // system("sudo ip link set can0 up");
+    // system("sudo ip link set can1 up");
 
     // 初始化CAN接口socket
     int s_can1 = init_can_socket(CAN1);

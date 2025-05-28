@@ -25,7 +25,7 @@
 // 定义对象字典（Object Dictionary）结构，包含设备参数和通信配置。
 #include "OD.h"
 // 提供存储模块接口，用于持久化参数。
-#include "lib/CO_storageBlank.h"
+#include "./include/CO_storageBlank.h"
 // 日志输出宏，用于调试信息打印。
 #define log_printf(macropar_message, ...) printf(macropar_message, ##__VA_ARGS__)
 

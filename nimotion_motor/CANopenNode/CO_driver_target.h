@@ -26,6 +26,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <linux/can.h>       // 添加CAN帧结构体定义
+#include <sys/socket.h>      // 添加socket相关函数声明
 
 #ifdef CO_DRIVER_CUSTOM
 #include "CO_driver_custom.h"
@@ -73,7 +75,7 @@ typedef struct {
 
 /* CAN module object */
 typedef struct {
-    void* CANptr;
+    void* CANptr;            // 用于存储SocketCAN的文件描述符
     CO_CANrx_t* rxArray;
     uint16_t rxSize;
     CO_CANtx_t* txArray;
@@ -122,6 +124,25 @@ typedef struct {
         CO_MemoryBarrier();                                                                                            \
         rxNew = NULL;                                                                                                  \
     }
+
+/* CAN发送函数实现（SocketCAN适配） */
+static inline bool_t CO_CANsend(CO_CANmodule_t *CANmodule, CO_CANtx_t *txMsg) {
+    int can_sock = (int)(uintptr_t)CANmodule->CANptr; // 从CANmodule获取socket描述符
+    struct can_frame frame;
+
+    frame.can_id = txMsg->ident;
+    frame.can_dlc = txMsg->DLC;
+    memcpy(frame.data, txMsg->data, txMsg->DLC);
+
+    ssize_t bytes_written = write(can_sock, &frame, sizeof(frame));
+    if (bytes_written == sizeof(frame)) {
+        txMsg->bufferFull = false; // 发送成功，清除缓冲区满标志
+        return true;
+    } else {
+        txMsg->bufferFull = true;  // 发送失败，设置缓冲区满标志
+        return false;
+    }
+}
 
 #ifdef __cplusplus
 }
