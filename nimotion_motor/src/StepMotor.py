@@ -1,20 +1,31 @@
 import canopen
-import struct
-import math
-import logging
+import time
 
+# CAN总线参数配置
+CAN_BIT_RATE = 1000000                      # 比特率
+CAN_BUS_TYPE = 'canalystii'                 # CAN总线类型
+CAN_CHANNEL  = 0                            # CAN通道
+CAN_EDS_FILE = 'NiMotion_STM42A_V1.07.eds'  # 伺服电机EDS文件
+CAN_NODE_CNT = 1                            # 伺服电机节点数量
 
 class StepMotor(object):
     def __init__(self, network, node_id, eds_file):
         """
-        初始化步进电机对象
         :param network: CAN总线网络对象
         :param node_id: 电机节点ID
         :param eds_file: 电机的EDS文件路径
         """
+        # print(f"传入的eds_file路径: {eds_file}")  # 调试输出eds文件路径
         self.network = network
-        self.node = canopen.RemoteNode(node_id, eds_file)
+        self.node = canopen.RemoteNode(node_id, eds_file)       
         self.network.add_node(self.node)
+        # 避免重复初始化
+        if not self.network.bus:
+            try:
+                self.network.connect(bustype=CAN_BUS_TYPE, channel=CAN_CHANNEL, bitrate=CAN_BIT_RATE)
+                print("CAN总线连接成功")
+            except Exception as e:
+                print(f"CAN总线连接失败: {e}")
 
         self.mcs = 2             # 电机细分
         self.current_acc = 1.0   # 电机加速电流，默认为1A
@@ -24,106 +35,217 @@ class StepMotor(object):
         self.dec = 0             # 电机减速度
 
         self.smooth_K = 0        # 平滑系数
-        self.cur_pulse = 0.0     # 当前位置(以脉冲为单位)
+        self.cur_position = 0    # 电机当前编码器位置
+        self.pulse_cycle = 16384 # 电机每转动一周的编码器脉冲数量
 
-    def __to_u32(self, float_value):
+    def download_fixed_params(self):
         """
-        将浮点数转换为32位无符号整数
-        :param float_value: 浮点数
-        :return: 32位无符号整数的十六进制表示
-        """
-        return hex(struct.unpack('>I', struct.pack('<f', float_value))[0])
-
-    def initialize(self):
-        """
-        初始化电机参数
-        """
-        # 设置电机细分
-        sec_table = {1:0, 2:1, 4:2, 6:3, 8:4, 16:5, 32:6, 64:7, 128:8}
-        #cur_pluse = 200 * pow(2, self.mcs)
-        self.node.sdo.download(0x2022, 0, b'\x02')  # 设置细分为2
-
-        # 电机使能，设置当前位置为原点位置
-        self.node.sdo.download(0x2010, 0, )             # 使能电机
-        self.node.sdo.download(0x2010, 0, b'\x00\x02')  # 设置当前位置为原点
-
-        # 设置电机加速度、减速度
-        self.node.sdo.download(0x2024, 0, b'\x00\x40\x9c\x47') # 设置加速度
-        self.node.sdo.download(0x2025, 0, b'\x00\x40\x9c\x47') # 设置减速度
-
-        # 设置电机加速电流，工作电流和保持电流
-        self.node.sdo.download(0x2027, 0, b'\x00\x00\x80\x3f') # 设置加速电流
-        self.node.sdo.download(0x2027, 0, b'\x00\x00\x80\x3f') # 设置工作电流
-        self.node.sdo.download(0x2028, 0, b'\x00\x00\x80\x3f') # 设置保持电流
-
-    def go_zero(self):
-        """
-        执行归零操作
-        """
-        self.node.sdo.download(0x2040, 0, b'\x01')              # 归零模式设置
-        self.node.sdo.download(0x2033, 0, b'\x00')              # 端口工作模式为输入
-        self.node.sdo.download(0x2043, 0, b'\x00')              # 设置传感器1为原点传感器
-        self.node.sdo.download(0x2030, 0, b'\x04\x00\x00\x00')  # 传感器1检测到上升沿后立刻停止
-        self.node.sdo.download(0x2035, 0, b'\x00')              # 设置原点传感器1内部为下拉
-        self.node.sdo.download(0x2042, 0, b'\x00')              # 原点传感器开放电平(低)
-        self.node.sdo.download(0x2044, 0, b'\x00\x00\xfa\x45')  # 归零速度(zsd)
-        # self.node.sdo.download(0x2045, 0, b'\x00\x00\xc8\x42')# 归零安全位置(zsp)
-        self.node.sdo.download(0x2010, 0, b'\x01\x09')          # 启动归零控制
-
-    def position_ctrl(self, ang_order, interval):
-        """
-        位置控制
-        :param pos_order: 目标位置，单位：度
-        :param interval: 控制周期(s)
+        设置伺服电机的固定参数。这些参数通常需要电机重新启动后生效，且参数下载后即存储在电机驱动器中，因此该函数仅需要在相关参数修改后调用一次
         :return:
         """
-        pulse = self.mcs * (ang_order/ 1.8)                                     # 计算目标脉冲数
-        pulse = self.smooth_K * self.cur_pulse + (1.0 - self.smooth_K) * pulse  # 平滑处理
-        speed = (pulse - self.cur_pulse) / interval                             # 计算目标速度
-        self.cur_pulse = pulse                                                  # 更新当前位置
+        # 周期同步位置控制参数
+        self.node.sdo["Basic control parameters"]["Contrl Mode Select"].raw         = 0     # 设置CiA402模式 2002
+        self.node.sdo["Mode Operation"].raw = 8                                             # 设置位置控制模式 P33 607B
+        self.node.sdo["Position range limit"]["Min position range limit"].raw  = -1048576   # 最小位置范围限制 607B
+        self.node.sdo["Position range limit"]["Max position range limit"].raw  = 1048576    # 最大位置范围限制 607B
+        self.node.sdo["Software position limit"]["Min position limit"].raw = -65535         # 最小软件位置限制 607D
+        self.node.sdo["Software position limit"]["Max position limit"].raw = 65535          # 最大软件位置限制 607D
+        self.node.sdo["Polarity"].raw             = 0                                       # 极性设置 607E
+        self.node.sdo["Profile acceleration"].raw = 409600                                  # 加速度设置 6083
+        self.node.sdo["Profile deceleration"].raw = 409600                                  # 减速度设置 6084
+        self.node.sdo["Max motor speed"].raw      = 3000                                    # 最大电机速度 6080
+        self.node.sdo["Max profile velocity"].raw = 500000                                  # 最大轮廓速度 607F
+        self.node.sdo["Target Position"].raw = -180000
 
+        # # 原点回归参数
+        # self.node.sdo["Homing method"].raw = 18                                             # 设置原点回归方式为18
+        # self.node.sdo["Input terminal parameters"]["DI1FunSelec"].raw = 14                  # 实体输入端子设置为原点开关
+        # self.node.sdo["Input terminal parameters"]["DI1LogicSelec"].raw = 1                 # 实体输入端子下降沿有效(NPN型)
+        # self.node.sdo["Position control parameters"]["StepAmount"].raw = 1000               # 步进量:-32768~32767
+        # self.node.sdo["Homing speed"]["Speed during search for zero"].raw = 5000            # 6099寻找原点信号的速度(用户单位/s)
+
+        # 配置RPDO映射
+        self.node.nmt.state = 'PRE-OPERATIONAL' # 设置NMT状态为预操作
         self.node.rpdo.read()
-        self.node.rpdo[2]['Target Speed (spd)'].raw = b'\x00\x40\x1c\x46'   # 设置电机目标速度
-        self.node.rpdo[2]['Target Position (moveto)'].raw = pulse           # 设置电机目标位置
-        self.node.rpdo[2].transmit()                                        # 发送RPDO
-
-
-class StepMotorGroup(object):
-    def __init__(self, bustype, channel, bitrate, motor_cnt):
+        self.node.rpdo[1].clear()
+        # self.node.rpdo[1].add_variable(0x607A, 0)                                   # 预设的目标位置（用户单位）607A 
+        self.node.rpdo[1].add_variable("Target Position")                                   # 预设的目标位置（用户单位）607A Target Position
+        self.node.rpdo[1].enabled = True
+        self.node.rpdo.save()
+        self.node.nmt.state = 'OPERATIONAL'     # 设置NMT状态为操作
+        print("RPDO1映射内容:", self.node.rpdo[1].map)
+        # 配置TPDO映射
+        pass
+    
+    def print_fixed_params(self):
         """
-        初始化步进电机组
-        :param bustype: CAN总线类型
-        :param channel: CAN通道
-        :param bitrate: CAN比特率
-        :param motor_cnt: 电机数量
+        打印显示伺服电机的固定参数，以便于调试使用
+        :return:
         """
-        # 初始化Motor类
-        self.network = canopen.Network()  # 创建总线网络
-        self.network.connect(bustype=bustype, channel=channel, bitrate=bitrate)
+        print("CtrlModeSelec        = %d" % self.node.sdo["Basic control parameters"]["Contrl Mode Select"].raw) #2002
+        print("Mode Operation       = %d" % self.node.sdo["Mode Operation"].raw) #6060
+        print("MinPosRangLimt       = %d" % self.node.sdo["Position range limit"]["Min position range limit"].raw) #607B
+        print("MaxPosRangLimt       = %d" % self.node.sdo["Position range limit"]["Max position range limit"].raw) #607B
+        print("MinPosLimt           = %d" % self.node.sdo["Software position limit"]["Min position limit"].raw) #607D
+        print("MaxPosLimt           = %d" % self.node.sdo["Software position limit"]["Max position limit"].raw) #607D
+        print("Polarity             = %d" % self.node.sdo["Polarity"].raw) #607E
+        print("Profile acceleration = %d" % self.node.sdo["Profile acceleration"].raw) #6083
+        print("Profile deceleration = %d" % self.node.sdo["Profile deceleration"].raw) #6084
+        print("Statusword           = %d" % self.node.sdo["Statusword"].raw) #6041
+        # print("Pre-defined Error Field = %d" % self.node.sdo["Pre-defined Error Field"]["Standard Error Field"].raw)
+        print("Homing method        = %d" % self.node.sdo["Homing method"].raw) #6098
+        print("Position ctrl para   = %d" % self.node.sdo["Position control parameters"]["StepAmount"].raw) #2005
+        print("Encoder resolution   = %d" % self.node.sdo["Position encoder resolution"]["Encoder increments"].raw) #608F
+        print("RatedVoltage(V)      = %d" % self.node.sdo["Stepper motor parameters"]["RatedVoltage"].raw) #2000
+        print("Max motor speed(rpm) = %d" % self.node.sdo["Max motor speed"].raw) #6080
+        print("Controlword          = %d" % self.node.sdo["Controlword"].raw) #6040
+        print("Pos Actual Value     = %d" % self.node.sdo["Pos Actual User Value"].raw) #6064
+        print("Target Position      = %d" % self.node.sdo["Target Position"].raw) #607A
+        print("Pos Demand Value     = %d" % self.node.sdo["Pos Demand Value"].raw) #6062
+        
+    
+    def enable(self):
+        """
+        使能电机
+        """
+        # 这里换成索引名
+        self.node.sdo["Controlword"].raw = 6   # 电机准备
+        self.node.sdo["Controlword"].raw = 7   # 电机失能
+        self.node.sdo["Controlword"].raw = 15  # 电机使能
+        time.sleep(0.1)  # 等待状态更新
+        status = self.node.sdo["Statusword"].raw
+        print(f"使能后状态字: {bin(status)}")  # 应为0bxxxxxx1xxx（驱动使能）
+        
+    def get_status(self):
+        status_word = self.node.sdo["Statusword"].raw
+        print(f"电机状态字: {status_word}")
+    
+    def start_position_ctrl(self):
+        """
+        启动位置控制模式
+        """
+        # 设置同步位置运行模式
+        self.node.sdo["Mode Operation"].raw = 8
 
-        self.motors = list()
-        for i in range(motor_cnt):
-            motor = StepMotor(self.network, 0, "C:\Users\Administrator\Desktop\opencan")
-            self.motors.append(motor)
+        # 读取电机当前编码器值
+        self.cur_position = self.node.sdo["Pos Actual User Value"].raw
 
-        # 示例：控制第一个电机移动360度，控制周期为0.2秒
-        motor.position_ctrl(360.0, 0.2)
-    def NMT_manage(self):
-        """
-        NMT管理，广播各个节点状态为操作模式
-        """
-        self.network.nmt.send_command(0x1)                  # 广播各个节点状态为操作模式
-        print("网络状态为 %s" % self.network.nmt.state)
+        # RPDO已经离线配置好了，仅需要读取配置
+        self.node.nmt.state = 'PRE-OPERATIONAL'
+        self.node.rpdo.read()
+        self.node.rpdo[1].enabled = True
+        self.node.nmt.state = 'OPERATIONAL'
 
-    def send_sync(self):
+        # 重新使能电机
+        self.enable()
+        
+    def send_position_order(self, target_pos):
         """
-        发送同步信号
+        发送位置命令
+        :param target_pos: 目标位置
         """
-        self.network.sync.start(0.05)                       # 每0.05秒发送一次同步信号
+        self.node.rpdo[1]['Target Position'].raw = target_pos
+        self.node.rpdo[1].transmit()        
 
-class GimbalCamera(object):
-    pass # 云台相机类，暂未实现
+# def position_ctrl_test(motor):
+#     """
+#     位置控制测试
+#     :param motors: 电机组
+#     """
+#     max_rpm = 1000
+#     motor.start_position_ctrl()
+#     target_pos = motor.cur_position
+#     rpm = 0
+#     acc = True
+#     for t in range(100):
+#         if rpm > max_rpm:
+#             acc = False
+#         elif rpm < -max_rpm:
+#             acc = True
+#         rpm += 5 if acc else -5    
+#         target_pos += rpm * motor.pulse_cycle // (60 * 50)
+#         motor.send_position_order(target_pos)
+#         actual_pos = motor.node.sdo["Pos Actual User Value"].raw
+#         print(f"目标位置: {target_pos}, 实际位置: {actual_pos}")
+#         time.sleep(0.005)
+#         # time.sleep(0.005)
+
+#     time.sleep(1)
+    
+#     print("Target position = %d" % target_pos)
+
+def position_ctrl_test(motor):
+    max_rpm = 75
+    A = -1000000
+    B = -700000
+    total_travel = B - A  # 计算总行程长度
+    direction = 1  # 初始方向为A到B
+    motor.start_position_ctrl()
+    target_pos = A  # 起始位置设为A
+    reversed_flag = False  # 用于标记是否刚刚反转方向
+
+    for t in range(30000):
+        # 根据当前方向确定起点和终点
+        if direction == 1:
+            current_start, current_end = A, B
+            d = target_pos - current_start
+        else:
+            current_start, current_end = B, A
+            d = current_start - target_pos
+
+        # 处理方向反转后的初始微小移动
+        if reversed_flag:
+            d = 1  # 设置微小位移以启动运动
+            reversed_flag = False
+        else:
+            d = max(0, min(d, total_travel))  # 确保位移在合理范围内
+
+        # 计算速度比例系数
+        if d < total_travel / 2:
+            rpm_ratio = d / (total_travel / 2)
+        else:
+            rpm_ratio = (total_travel - d) / (total_travel / 2)
+
+        # 计算实际转速（考虑方向）
+        actual_rpm = rpm_ratio * max_rpm * direction
+
+        # 计算位置增量
+        delta = actual_rpm * motor.pulse_cycle // (60 * 50)
+        # 确保至少产生1个脉冲的位移
+        if delta == 0:
+            delta = 1 if direction == 1 else -1
+
+        # 检查边界并处理方向反转
+        new_target = target_pos + delta
+        if direction == 1 and new_target > current_end:
+            delta = current_end - target_pos
+            direction = -1
+            reversed_flag = True
+        elif direction == -1 and new_target < current_end:
+            delta = current_end - target_pos
+            direction = 1
+            reversed_flag = True
+
+        target_pos += delta
+
+        # 发送位置指令并读取实际位置
+        motor.send_position_order(target_pos)
+        actual_pos = motor.node.sdo["Pos Actual User Value"].raw
+        print(f"目标位置: {target_pos}, 实际位置: {actual_pos}")
+        time.sleep(0.005)
 
 if __name__ == "__main__":
-    group = StepMotorGroup(bustype='canalystii', channel=0, bitrate=1000000, motor_cnt=1)
-    group[1]  # 这行代码似乎有误，应该是 group.motors[0] 或其他有效操作
+
+    network = canopen.Network()  
+    motor = StepMotor(network, 1, CAN_EDS_FILE)
+    motor.download_fixed_params()
+    motor.print_fixed_params()
+    # motor.get_status()
+
+    position_ctrl_test(motor)
+    
+    # motor.enable()
+    # motor.send_position_order(-750000)
+    
+    print("目标位置      = %d" % motor.node.sdo["Target Position"].raw) #607A
+    print("当前位置     = %d" % motor.node.sdo["Pos Actual User Value"].raw) #6064

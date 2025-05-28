@@ -4,7 +4,7 @@ import time
 # CAN总线参数配置
 CAN_BIT_RATE = 250000                       # 比特率
 CAN_BUS_TYPE = 'canalystii'                 # CAN总线类型
-CAN_CHANNEL  = 0                            # CAN通道
+CAN_CHANNEL  = 1                            # CAN通道
 CAN_EDS_FILE = 'NiMotion_BLM57B_V1.10.eds'  # 伺服电机EDS文件
 CAN_NODE_CNT = 1                            # 伺服电机节点数量
 
@@ -133,13 +133,7 @@ class ServoMotor(object):
         # 重新使能电机
         self.enable()
 
-    def send_position_order(self, target_pos):
-        """
-        发送位置命令
-        :param target_pos: 目标位置
-        """
-        self.node.rpdo[1]['Target position'].raw = target_pos
-        self.node.rpdo[1].transmit()
+ 
 
     def homing(self):
         """
