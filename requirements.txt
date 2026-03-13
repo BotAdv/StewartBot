@@ -1,0 +1,30 @@
+# --- 核心开发工具 (兼容 Python 3.10) ---
+jupyterlab>=3.4.0,<4.0.0
+ipykernel>=6.15.0
+ipython>=8.4.0,<9.0.0
+rich>=12.0.0,<14.0.0
+twine>=4.0.0
+requests>=2.28.0
+
+# --- 科学计算 (锁定兼容 3.10 的版本，避免自动升级到需 3.11 的最新版) ---
+numpy>=1.23.0,<2.0.0
+scipy>=1.9.0,<1.12.0
+matplotlib>=3.5.0,<3.8.0
+pandas>=1.4.0,<2.0.0
+
+# --- ROS2 与 CAN 通信核心依赖 ---
+# python-can: CAN总线底层驱动
+python-can>=4.0.0,<5.0.0
+
+# canopen: 正确的 CANopen 协议栈包名 (修正了 can-open 的错误)
+canopen>=0.9.0,<1.0.0
+pyyaml>=6.0
+
+# --- 仿真与测试 ---
+pytest>=7.1.0,<8.0.0
+pytest-cov>=3.0.0
+# pybullet: 物理仿真 (如果不需要可注释)
+pybullet>=3.2.0
+
+# --- 其他工具 ---
+pyserial>=3.5

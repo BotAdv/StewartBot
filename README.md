@@ -14,9 +14,9 @@ ____
 - [x] Framework Build  
 - [x] CanOpen Nimotion Motor Control  
 - [x] Muti Motor Control  
-- [x] Kinematic modeling  
-- [x] Structural design
-- [x] Simulation && Prototype verification  
+- [ ] Kinematic modeling  
+- [ ] Structural design
+- [ ] Simulation && Prototype verification  
 - [ ] Binocular visual perception module  
 - [ ] LiDAR mapping module
 - [ ] Enclosed space SLAM
@@ -31,13 +31,13 @@ ____
 | -----------         | -----------                 |  
 |*System*             |**X86_64-Unbutu22.04**       |  
 |*Software systems*   |**ROS2 humble**              |  
-|*Hardware platform*  |**NiMotion Motor-STM4248A**  |  
+|*Hardware device*  |**NiMotion Motor-STM4248A**  |  
 |*Communication*      |**CANopen**                  |  
-|*Controller*         |**BECKOFF**                  |  
+|*Controller*         |**（Raspberry Pi）**                  |  
 
 ### Get source code  
 
-- Create workspace
+<!-- - Create workspace
 
   ```shell
   mkdir -p robot_ws/src
@@ -55,15 +55,34 @@ ____
 
   ```shell
   cd src
-  ```  
+  ```   -->
 
 - Fetch source code  
 
   ```shell
-  git clone https://github.com/BotAdv/StewartBot.git
+  git clone -b feature/Nimotion git@github.com:BotAdv/StewartBot.git
   ```
 
-[StewartBot-dev](https://github.com/BotAdv/StewartBot.git)
+- build env
+
+  ```shell
+  conda create -n stewart python=3.10 -y
+  ```
+
+- activate env
+
+  ```shell
+  conda activate stewart
+  ```
+
+- install packages
+
+  ```shell
+  pip install -r requirements.txt
+  ```
+
+
+[StewartBot-/feature/Nimotion](https://github.com/BotAdv/StewartBot/tree/feature/Nimotion)
 
 ____
 
@@ -78,6 +97,8 @@ ____
 
 ## Collaborators
 
-**BotAdv**  
-**Lancee**  
+**[@BotAdv](https://github.com/BotAdv)**  
+**[@Lancee](https://github.com/Lancee0812)**  
+**[@余文锦](https://github.com/余文锦)**  
+<!-- **（余文锦）** -->  
 ____
