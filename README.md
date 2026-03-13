@@ -81,7 +81,6 @@ ____
   pip install -r requirements.txt
   ```
 
-
 [StewartBot-/feature/Nimotion](https://github.com/BotAdv/StewartBot/tree/feature/Nimotion)
 
 ____
@@ -98,7 +97,7 @@ ____
 ## Collaborators
 
 **[@BotAdv](https://github.com/BotAdv)**  
-**[@Lancee](https://github.com/Lancee0812)**  
+**[@Lancee0812](https://github.com/Lancee0812)**  
 **[@余文锦](https://github.com/余文锦)**  
 <!-- **（余文锦）** -->  
 ____
