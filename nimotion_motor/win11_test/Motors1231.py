@@ -9,8 +9,8 @@ import sys
 CAN_BIT_RATE = 1000000                      # 比特率
 CAN_BUS_TYPE = 'canalystii'                 # CAN总线类型
 CAN_CHANNEL  = 0                            # CAN通道
-CAN_EDS_FILE = 'NiMotion_STM42A_V1.07.eds'  # 伺服电机EDS文件
-CAN_NODE_CNT = 4                            # 伺服电机节点数量
+CAN_EDS_FILE = 'NiMotion_PMM80B_V1.14.eds'  # 伺服电机EDS文件
+CAN_NODE_CNT = 10                           # 伺服电机节点数量
 
 class StepMotor(object):
     def __init__(self, network, node_id, eds_file):

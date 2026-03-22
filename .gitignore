@@ -3,3 +3,5 @@ nimotion_motor/doc
 nimotion_motor/CANalyst-demo/Demo3_qt_error
 __pycache__/
 ./pybullrt/__pycache__/
+win_tools
+nimotion_motor/.idea/
