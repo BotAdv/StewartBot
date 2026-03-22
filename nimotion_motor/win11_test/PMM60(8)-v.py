@@ -104,10 +104,26 @@ class PMM60Motor(object):
     def wait_for_home(self):
         status_word = self.node.sdo["Statusword"].raw
         return status_word & 0x1000
+    
+    def init_tpdo(self):
+        """配置TPDO，用于接收实际位置"""
+        self.node.tpdo.read()
+        self.node.tpdo[1].clear()
+        self.node.tpdo[1].add_variable("Position actual value")
+        self.node.tpdo[1].enabled = True
+        self.node.tpdo[1].event_timer = 5  # 每5ms触发一次（可选）
+        self.node.nmt.state = 'PRE-OPERATIONAL'
+        self.node.tpdo.save()
+        self.node.nmt.state = 'OPERATIONAL'
+
+    def get_actual_position(self):
+        """获取当前实际位置（从TPDO读取）"""
+        # 如果有最新接收的TPDO数据则直接返回，否则等待
+        return self.node.tpdo[1]['Position actual value'].raw
 
 
 class MotorGroup(object):
-    def __init__(self, bustype, channel, bitrate, motor_cnt, ctrl_interval=None):
+    def __init__(self, bustype, channel, bitrate, motor_cnt, ctrl_interval=0.01):
         # 连接CAN总线网络
         self.network = canopen.Network()  # 创建总线网络
         self.network.connect(bustype=bustype, channel=channel, bitrate=bitrate)   # 启动通信
@@ -133,9 +149,10 @@ class MotorGroup(object):
             motor.init_tpdo()  # 配置TPDO
 
     def send_position_order(self, target_pos):
+        # 发送目标位置（多电机）
         for i, motor in enumerate(self.motors):
-            motor.send_position_order(target_pos=target_pos[i])
-            print(target_pos)
+            motor.send_position_order(target_pos[i])
+            # print(target_pos)
 
     def start_home_ctrl(self):
         for _, motor in enumerate(self.motors):
@@ -158,6 +175,70 @@ class MotorGroup(object):
             # 输出新的目标位置
             self.send_position_order(target_pos)
             time.sleep(self.ctrl_interval)
+            
+    def run_with_velocity_plan(self, max_rpm, acc_rpm_per_sec, target_rpm):
+        """
+        梯形速度规划控制
+        :param max_rpm:       最大速度(rpm)
+        :param acc_rpm_per_sec: 加速度(rpm/s)
+        :param target_rpm:    目标速度(rpm)，正负表示方向
+        """
+        current_rpm = 0.0
+        acc_step = acc_rpm_per_sec * self.ctrl_interval  # 每周期速度变化量
+
+        # 初始化位置（使用实际位置）
+        init_pos = self.motors[0].get_actual_position()
+        pos = init_pos  # 当前累积位置（用户单位）
+
+        t = 0
+        while True:
+            # 速度规划：根据当前速度与目标速度的差值，以加速度步长调整
+            if current_rpm < target_rpm:
+                current_rpm = min(current_rpm + acc_step, target_rpm)
+            elif current_rpm > target_rpm:
+                current_rpm = max(current_rpm - acc_step, target_rpm)
+
+            # 限制最大速度
+            current_rpm = max(-max_rpm, min(current_rpm, max_rpm))
+
+            # 计算位置增量（使用浮点数）
+            delta_pos = current_rpm * self.motors[0].pulse_cycle * self.ctrl_interval / 60.0
+            pos += delta_pos
+            target_pos = int(round(pos))  # 取整
+
+            # 发送目标位置（支持多电机，此处简化为单电机）
+            self.send_position_order([target_pos])
+
+            # 记录数据
+            actual_pos = self.motors[0].get_actual_position()
+            self.time_list.append(t)
+            self.target_pos_list.append(target_pos)
+            self.actual_pos_list.append(actual_pos)
+
+            # 可选：打印调试信息
+            # print(f"t={t:.2f}, rpm={current_rpm:.1f}, target={target_pos}, actual={actual_pos}")
+
+            t += self.ctrl_interval
+            time.sleep(self.ctrl_interval)
+
+            # 退出条件：例如达到目标圈数或按需停止
+            # 这里示例为运行5秒后停止
+            if t > 5.0:
+                break
+
+        # 绘制曲线
+        self.plot_data()
+        
+    def plot_data(self):
+        plt.figure(figsize=(10, 6))
+        plt.plot(self.time_list, self.target_pos_list, label='Target Position')
+        plt.plot(self.time_list, self.actual_pos_list, label='Actual Position')
+        plt.xlabel('Time (s)')
+        plt.ylabel('Position (pulses)')
+        plt.legend()
+        plt.title('Position Tracking Performance')
+        plt.grid(True)
+        plt.show()
 
 def position_ctrl_test():
     group = MotorGroup(bustype='canalystii', channel=0, bitrate=1000000, motor_cnt=1)
@@ -212,8 +293,22 @@ def home_ctrl_test():
             break
         else:
             print("Motors are homing")
+            
+def position_ctrl_with_smooth_velocity():
+    group = MotorGroup(bustype='canalystii', channel=0, bitrate=1000000, motor_cnt=1,ctrl_interval=0.01)
+    group.motors[0].download_fixed_params()
+    group.start_position_ctrl()
+
+    # 设定运动参数
+    max_rpm = 500          # 最大速度 500 rpm
+    acc = 2000             # 加速度 2000 rpm/s
+    target_rpm = 400       # 目标速度 400 rpm，运行 5 秒后停止
+
+    # 运行速度规划控制
+    group.run_with_velocity_plan(max_rpm, acc, target_rpm)
 
 
 if __name__ == "__main__":
-    position_ctrl_test()
-    #home_ctrl_test()
+    # position_ctrl_test()
+    # home_ctrl_test()
+    position_ctrl_with_smooth_velocity()
