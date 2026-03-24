@@ -2,6 +2,7 @@ import canopen
 import time
 import math
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 class PMM60Motor(object):
@@ -54,25 +55,83 @@ class PMM60Motor(object):
         print("Profile acceleration = %d" % self.node.sdo["Profile acceleration"].raw)
         print("Profile deceleration = %d" % self.node.sdo["Profile deceleration"].raw)
         print("Profile deceleration = %d" % ["Homing method"].raw)
-    def start_position_ctrl(self):
+    def start_position_ctrl(self,use_sync=True, sync_period_ms=10):
+        # # 1. 先进入 PRE-OPERATIONAL 状态以便修改 PDO
+        # self.node.nmt.state = 'PRE-OPERATIONAL'
+        
         # 设置同步位置运行模式
         self.node.sdo["Modes of operation"].raw = 8
         # 读取电机当前编码器值
         self.init_position = self.cur_position = self.node.sdo["Position actual value"].raw
 
-        # 配置RPDO
+        # # 配置RPDO
+        # self.node.rpdo.read()
+        # self.node.rpdo[1].clear()
+        # self.node.rpdo[1].add_variable("Target position")
+        # self.node.rpdo[1].enabled = True
+        
+        # # 配置 TPDO
+        # self.node.tpdo.read()
+        # self.node.tpdo[1].clear()
+        # self.node.tpdo[1].add_variable("Position actual value")
+        # self.node.tpdo[1].enabled = True
+        
+        
+        # if use_sync:
+        #     self.node.tpdo[1].trans_type = 1   # 同步发送
+        #     self.node.tpdo[1].event_timer = 0
+        # else:
+        #     self.node.tpdo[1].trans_type = 255  # 事件触发
+        #     self.node.tpdo[1].event_timer = 10  # 10 ms
+
+
+        # self.node.rpdo.save()
+        # self.node.tpdo.save()
+        # self.node.nmt.state = 'OPERATIONAL'
+        
+        # 配置 PDO
+        self.configure_pdos(use_sync, sync_period_ms)
+
+        # 使能电机
+        self.enable()
+        
+    def configure_pdos(self, use_sync=True, sync_period_ms=10):
+        """配置 RPDO 和 TPDO"""
+        # 1. 先进入 PRE-OPERATIONAL 状态以便修改 PDO
+        self.node.nmt.state = 'PRE-OPERATIONAL'
+        time.sleep(0.05)
+
+        # 2. 配置 RPDO（目标位置）
         self.node.rpdo.read()
         self.node.rpdo[1].clear()
         self.node.rpdo[1].add_variable("Target position")
         self.node.rpdo[1].enabled = True
 
-        self.node.nmt.state = 'PRE-OPERATIONAL'
+        # 3. 配置 TPDO（实际位置）
+        self.node.tpdo.read()
+        self.node.tpdo[1].clear()
+        self.node.tpdo[1].add_variable("Position actual value")
+        self.node.tpdo[1].enabled = True
+
+        if use_sync:
+            self.node.tpdo[1].trans_type = 1   # 同步发送
+            self.node.tpdo[1].event_timer = 0
+        else:
+            self.node.tpdo[1].trans_type = 255  # 事件触发
+            self.node.tpdo[1].event_timer = 10  # 10 ms
+
+        # 4. 保存 PDO 配置
         self.node.rpdo.save()
+        self.node.tpdo.save()
+
+        # 5. 回到 OPERATIONAL 状态
         self.node.nmt.state = 'OPERATIONAL'
+        time.sleep(0.05)
 
-        # 使能电机
-        self.enable()
-
+    def start_sync_producer(self, sync_period_ms=10):
+        # 配置 SYNC 生产者
+        self.network.sync.start(sync_period_ms / 1000.0)  # 单位秒
+    
     def start_home_ctrl(self):
         self.download_fixed_params()
         # 设置原点回归模式
@@ -105,20 +164,33 @@ class PMM60Motor(object):
         status_word = self.node.sdo["Statusword"].raw
         return status_word & 0x1000
     
-    def init_tpdo(self):
-        """配置TPDO，用于接收实际位置"""
-        self.node.tpdo.read()
-        self.node.tpdo[1].clear()
-        self.node.tpdo[1].add_variable("Position actual value")
-        self.node.tpdo[1].enabled = True
-        self.node.tpdo[1].event_timer = 5  # 每5ms触发一次（可选）
-        self.node.nmt.state = 'PRE-OPERATIONAL'
-        self.node.tpdo.save()
-        self.node.nmt.state = 'OPERATIONAL'
+    # def init_tpdo(self):
+    #     """配置TPDO，用于接收实际位置"""
+    #     self.node.tpdo.read()
+    #     self.node.tpdo[1].clear()
+    #     self.node.tpdo[1].add_variable("Position actual value")
+    #     self.node.tpdo[1].enabled = True
+    #     self.node.tpdo[1].event_timer = 2  # 每5ms触发一次（可选）
+    #     self.node.nmt.state = 'PRE-OPERATIONAL'
+    #     self.node.tpdo.save()
+    #     self.node.nmt.state = 'OPERATIONAL'
+    
+    def check_tpdo_config(self):
+        # 读取 TPDO 1 的通信参数（索引 0x1800）
+        # 子索引 2 = transmission type
+        # 子索引 3 = inhibit time (单位 100 µs)
+        # 子索引 5 = event timer (单位 ms)
+        trans_type = self.node.sdo[0x1800][2].raw
+        event_timer = self.node.sdo[0x1800][5].raw
+        print(f"TPDO1: trans_type={trans_type}, event_timer={event_timer}")
 
     def get_actual_position(self):
         """获取当前实际位置（从TPDO读取）"""
         # 如果有最新接收的TPDO数据则直接返回，否则等待
+        try:
+            self.node.tpdo[1].wait_for_reception(timeout=0.01)
+        except canopen.TimeoutError:
+            pass
         return self.node.tpdo[1]['Position actual value'].raw
 
 
@@ -143,10 +215,13 @@ class MotorGroup(object):
         self.target_pos_list = []
         self.actual_pos_list = []
 
-    def start_position_ctrl(self):
-        for _, motor in enumerate(self.motors):
-            motor.start_position_ctrl()
-            motor.init_tpdo()  # 配置TPDO
+    def start_position_ctrl(self, use_sync=True, sync_period_ms=10):
+        # for _, motor in enumerate(self.motors):
+        #     motor.start_position_ctrl()
+        for motor in self.motors:
+            motor.start_position_ctrl(use_sync, sync_period_ms)
+        if use_sync:
+            self.network.sync.start(sync_period_ms / 1000.0)
 
     def send_position_order(self, target_pos):
         # 发送目标位置（多电机）
@@ -216,18 +291,22 @@ class MotorGroup(object):
             self.actual_pos_list.append(actual_pos)
 
             # 可选：打印调试信息
-            # print(f"t={t:.2f}, rpm={current_rpm:.1f}, target={target_pos}, actual={actual_pos}")
+            print(f"t={t:.2f}, rpm={current_rpm:.1f}, target={target_pos}, actual={actual_pos}")
 
             t += self.ctrl_interval
             time.sleep(self.ctrl_interval)
 
             # 退出条件：例如达到目标圈数或按需停止
             # 这里示例为运行5秒后停止
-            if t > 5.0:
+            if t > 3.0:
                 break
-
-        # 绘制曲线
+        
+        # 保存数据到CSV
+        data = np.column_stack((self.time_list, self.target_pos_list, self.actual_pos_list))
+        np.savetxt("motor_trace.csv", data, delimiter=",", header="time,target,actual", comments="")
         self.plot_data()
+        # # # 绘制曲线
+        # self.plot_data()
         
     def plot_data(self):
         plt.figure(figsize=(10, 6))
@@ -295,13 +374,13 @@ def home_ctrl_test():
             print("Motors are homing")
             
 def position_ctrl_with_smooth_velocity():
-    group = MotorGroup(bustype='canalystii', channel=0, bitrate=1000000, motor_cnt=1,ctrl_interval=0.01)
+    group = MotorGroup(bustype='canalystii', channel=0, bitrate=1000000, motor_cnt=1,ctrl_interval=0.001)
     group.motors[0].download_fixed_params()
     group.start_position_ctrl()
 
     # 设定运动参数
-    max_rpm = 500          # 最大速度 500 rpm
-    acc = 2000             # 加速度 2000 rpm/s
+    max_rpm = 200          # 最大速度 500 rpm
+    acc = 500             # 加速度 2000 rpm/s
     target_rpm = 400       # 目标速度 400 rpm，运行 5 秒后停止
 
     # 运行速度规划控制
